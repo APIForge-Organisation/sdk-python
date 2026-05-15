@@ -33,7 +33,7 @@ class CloudTransport:
                 "service":     self._service,
                 "env":         r["env"],
                 "release":     r.get("release_tag"),
-                "time":        datetime.fromtimestamp(r["bucket_ts"], tz=timezone.utc).isoformat(),
+                "time":        datetime.fromtimestamp(r["bucket_ts"], tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'),
                 "calls_total": r["total_calls"],
                 "calls_2xx":   r["status_2xx"],
                 "calls_4xx":   r["status_4xx"],

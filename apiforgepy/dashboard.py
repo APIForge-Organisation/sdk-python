@@ -324,11 +324,9 @@ input.fld:focus { outline: 2px solid var(--accent-line); border-color: var(--acc
 <body>
   <div id="root"></div>
 
-  <!-- React UMD served from node_modules by apiforgejs dashboard server -->
-  <script src="/assets/react.js"></script>
-  <script src="/assets/react-dom.js"></script>
-  <!-- Babel standalone for in-browser JSX transpilation -->
-  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js" crossorigin></script>
 
   <script type="text/babel" data-presets="react">
 'use strict';
@@ -1673,9 +1671,23 @@ def _make_handler(db):
             if path == "/" or path == "":
                 self._respond(200, "text/html", _HTML.encode())
             elif path == "/api/summary":
-                summary = db.get_summary()
-                summary["health_score"] = compute_health_score(db)
-                self._json(summary)
+                raw      = db.get_summary()
+                recent   = raw.get("recent") or {}
+                total    = recent.get("calls_total") or 0
+                errors   = (recent.get("calls_4xx") or 0) + (recent.get("calls_5xx") or 0)
+                err_rate = round((errors / total) * 100, 2) if total > 0 else 0.0
+                insights = get_insights(db)
+                self._json({
+                    "health_score":   compute_health_score(db),
+                    "calls_24h":      total,
+                    "error_rate_24h": err_rate,
+                    "avg_p90_24h":    round(recent.get("avg_p90") or 0, 2),
+                    "avg_p99_24h":    round(recent.get("avg_p99") or 0, 2),
+                    "active_routes":  raw.get("active_routes", 0),
+                    "total_routes":   raw.get("total_routes", 0),
+                    "insights_count": len(insights),
+                    "insights":       insights,
+                })
             elif path == "/api/routes":
                 hours = int(qs.get("hours", [24])[0])
                 self._json(db.get_routes(hours))
@@ -1687,6 +1699,11 @@ def _make_handler(db):
                     self._json(db.get_time_series(route, method, hours))
                 else:
                     self._json(db.get_global_time_series(hours))
+            elif path == "/api/global-timeseries":
+                hours = int(qs.get("hours", [24])[0])
+                self._json(db.get_global_time_series(hours))
+            elif path == "/api/releases":
+                self._json(db.get_releases() if hasattr(db, "get_releases") else [])
             elif path == "/api/insights":
                 self._json(get_insights(db))
             else:

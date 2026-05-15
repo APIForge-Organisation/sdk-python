@@ -9,7 +9,6 @@ def make_app(db_path=":memory:", sampling=1.0, ignore_paths=None):
     app = FastAPI()
     app.add_middleware(
         ApiForgeMiddleware,
-        mode="local",
         db_path=db_path,
         dashboard_port=0,
         flush_interval=999_999,

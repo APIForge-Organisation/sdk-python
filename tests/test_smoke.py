@@ -9,7 +9,6 @@ def make_app(db_path=":memory:"):
     app = FastAPI()
     app.add_middleware(
         ApiForgeMiddleware,
-        mode="local",
         db_path=db_path,
         dashboard_port=0,
         flush_interval=999_999,
@@ -62,10 +61,10 @@ def test_multiple_methods():
     assert client.post("/users").status_code == 200
 
 
-def test_invalid_mode_raises():
-    with pytest.raises(ValueError, match="not yet supported"):
+def test_partial_cloud_config_raises():
+    with pytest.raises(ValueError, match="both cloud_url and api_key"):
         app = FastAPI()
-        app.add_middleware(ApiForgeMiddleware, mode="saas", dashboard_port=0)
+        app.add_middleware(ApiForgeMiddleware, cloud_url="https://api.apiforge.fr", dashboard_port=0)
         client = TestClient(app)
         client.get("/")
 

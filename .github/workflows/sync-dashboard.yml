@@ -1,0 +1,67 @@
+name: Sync Dashboard UI
+
+on:
+  repository_dispatch:
+    types: [dashboard-ui-updated]
+
+jobs:
+  sync:
+    name: Fetch and embed updated UI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Fetch latest ui.html from dashboard-ui
+        run: |
+          curl -sSfL \
+            "https://raw.githubusercontent.com/APIForge-Organisation/dashboard-ui/main/ui.html" \
+            -o /tmp/ui.html
+
+      - name: Embed HTML into dashboard.py
+        run: |
+          python3 - << 'PYEOF'
+          import re
+
+          with open('/tmp/ui.html', 'r', encoding='utf-8') as f:
+              html = f.read()
+
+          with open('apiforgepy/dashboard.py', 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          # Escape backslashes and triple-quotes for a Python triple-quoted string
+          escaped = html.replace('\\', '\\\\').replace('"""', '\\"\\"\\"')
+
+          start = '# <<DASHBOARD_UI_START>>'
+          end   = '# <<DASHBOARD_UI_END>>'
+          block = f'{start}\n_HTML = """\\\n{escaped}\n"""\n{end}'
+
+          new_content = re.sub(
+              re.escape(start) + r'.*?' + re.escape(end),
+              block,
+              content,
+              flags=re.DOTALL,
+          )
+
+          with open('apiforgepy/dashboard.py', 'w', encoding='utf-8') as f:
+              f.write(new_content)
+
+          print('dashboard.py updated.')
+          PYEOF
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apiforgepy/dashboard.py
+          if git diff --staged --quiet; then
+            echo "No changes — already up to date."
+          else
+            git commit -m "chore: sync dashboard UI from dashboard-ui@${{ github.event.client_payload.sha }}"
+            git push origin dev
+            echo "Pushed updated dashboard.py to dev."
+          fi

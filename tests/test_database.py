@@ -23,6 +23,7 @@ def insert_row(db, **overrides):
         lat_p99=99.0,
         lat_min=10.0,
         lat_max=150.0,
+        bytes_avg=None,
     )
     db.insert_batch([{**defaults, **overrides}])
 
@@ -173,4 +174,20 @@ class TestGetGlobalTimeSeries:
         insert_row(db, bucket_ts=int(time.time()) - 60)
         rows = db.get_global_time_series(24)
         assert len(rows) >= 1
+        db.close()
+
+
+class TestBytesAvg:
+    def test_stored_and_returned_in_get_routes(self):
+        db = make_db()
+        insert_row(db, route="/size", bytes_avg=512.0)
+        routes = db.get_routes(24)
+        assert routes[0]["bytes_avg"] == pytest.approx(512.0)
+        db.close()
+
+    def test_null_bytes_avg_when_not_provided(self):
+        db = make_db()
+        insert_row(db, route="/nosize", bytes_avg=None)
+        routes = db.get_routes(24)
+        assert routes[0]["bytes_avg"] is None
         db.close()

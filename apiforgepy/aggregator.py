@@ -32,17 +32,20 @@ class Aggregator:
         with self._lock:
             if key not in self._buffer:
                 self._buffer[key] = {
-                    "method":     event["method"],
-                    "route":      event["route"],
-                    "env":        event["env"],
-                    "release":    event.get("release"),
-                    "durations":  [],
-                    "status_2xx": 0,
-                    "status_4xx": 0,
-                    "status_5xx": 0,
+                    "method":         event["method"],
+                    "route":          event["route"],
+                    "env":            event["env"],
+                    "release":        event.get("release"),
+                    "durations":      [],
+                    "response_sizes": [],
+                    "status_2xx":     0,
+                    "status_4xx":     0,
+                    "status_5xx":     0,
                 }
             bucket = self._buffer[key]
             bucket["durations"].append(event["duration_ms"])
+            if event.get("response_size") is not None:
+                bucket["response_sizes"].append(event["response_size"])
             s = event["status"]
             if 200 <= s < 300:
                 bucket["status_2xx"] += 1
@@ -73,21 +76,24 @@ class Aggregator:
         for bucket in snapshot.values():
             sorted_d = sorted(bucket["durations"])
             n = len(sorted_d)
+            sizes = bucket["response_sizes"]
+            bytes_avg = sum(sizes) / len(sizes) if sizes else None
             rows.append({
-                "bucket_ts":  bucket_ts,
-                "route":      bucket["route"],
-                "method":     bucket["method"],
-                "env":        bucket["env"],
+                "bucket_ts":   bucket_ts,
+                "route":       bucket["route"],
+                "method":      bucket["method"],
+                "env":         bucket["env"],
                 "release_tag": bucket["release"],
-                "status_2xx": bucket["status_2xx"],
-                "status_4xx": bucket["status_4xx"],
-                "status_5xx": bucket["status_5xx"],
+                "status_2xx":  bucket["status_2xx"],
+                "status_4xx":  bucket["status_4xx"],
+                "status_5xx":  bucket["status_5xx"],
                 "total_calls": n,
-                "lat_p50":    _percentile(sorted_d, 0.50),
-                "lat_p90":    _percentile(sorted_d, 0.90),
-                "lat_p99":    _percentile(sorted_d, 0.99),
-                "lat_min":    sorted_d[0] if sorted_d else 0,
-                "lat_max":    sorted_d[-1] if sorted_d else 0,
+                "lat_p50":     _percentile(sorted_d, 0.50),
+                "lat_p90":     _percentile(sorted_d, 0.90),
+                "lat_p99":     _percentile(sorted_d, 0.99),
+                "lat_min":     sorted_d[0] if sorted_d else 0,
+                "lat_max":     sorted_d[-1] if sorted_d else 0,
+                "bytes_avg":   bytes_avg,
             })
 
         self._transport.write(rows)

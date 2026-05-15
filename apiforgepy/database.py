@@ -42,7 +42,8 @@ class ApiForgeDatabase:
                 lat_p90     REAL,
                 lat_p99     REAL,
                 lat_min     REAL,
-                lat_max     REAL
+                lat_max     REAL,
+                bytes_avg   REAL
             );
 
             CREATE INDEX IF NOT EXISTS idx_route_ts  ON api_metrics (route, method, bucket_ts);
@@ -50,6 +51,11 @@ class ApiForgeDatabase:
             CREATE INDEX IF NOT EXISTS idx_release   ON api_metrics (release_tag)
                 WHERE release_tag IS NOT NULL;
         """)
+        # Migration for databases created before bytes_avg was introduced
+        try:
+            c.execute("ALTER TABLE api_metrics ADD COLUMN bytes_avg REAL")
+        except Exception:
+            pass  # column already exists
         c.commit()
 
     def insert_batch(self, rows: list[dict]):
@@ -60,11 +66,11 @@ class ApiForgeDatabase:
                 INSERT INTO api_metrics
                     (bucket_ts, route, method, env, release_tag,
                      status_2xx, status_4xx, status_5xx, total_calls,
-                     lat_p50, lat_p90, lat_p99, lat_min, lat_max)
+                     lat_p50, lat_p90, lat_p99, lat_min, lat_max, bytes_avg)
                 VALUES (
                     :bucket_ts, :route, :method, :env, :release_tag,
                     :status_2xx, :status_4xx, :status_5xx, :total_calls,
-                    :lat_p50, :lat_p90, :lat_p99, :lat_min, :lat_max
+                    :lat_p50, :lat_p90, :lat_p99, :lat_min, :lat_max, :bytes_avg
                 )
             """, rows)
             self._conn.commit()
@@ -138,7 +144,8 @@ class ApiForgeDatabase:
                 AVG(lat_p50)     as p50,
                 AVG(lat_p90)     as p90,
                 AVG(lat_p99)     as p99,
-                MAX(lat_max)     as lat_max
+                MAX(lat_max)     as lat_max,
+                AVG(bytes_avg)   as bytes_avg
             FROM api_metrics
             WHERE bucket_ts >= ?
             GROUP BY route, method

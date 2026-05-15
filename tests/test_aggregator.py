@@ -119,3 +119,18 @@ class TestFlush:
         agg.record(base_event())
         agg.stop()
         assert len(t.calls) == 1, "stop() must flush remaining events"
+
+    def test_bytes_avg_is_mean_of_non_null_sizes(self):
+        t = make_transport()
+        agg = Aggregator(t, flush_interval_ms=999_999_000)
+        agg.record(base_event(response_size=100))
+        agg.record(base_event(response_size=300))
+        agg._flush()
+        assert t.calls[0][0]["bytes_avg"] == pytest.approx(200.0)
+
+    def test_bytes_avg_is_none_when_no_sizes(self):
+        t = make_transport()
+        agg = Aggregator(t, flush_interval_ms=999_999_000)
+        agg.record(base_event(response_size=None))
+        agg._flush()
+        assert t.calls[0][0]["bytes_avg"] is None

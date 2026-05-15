@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "apiforgepy"
-version = "0.1.0"
+version = "1.0.0"
 description = "API observability & intelligence for FastAPI/Starlette — local-first, privacy-first"
 readme = "README.md"
 license = { text = "MIT" }

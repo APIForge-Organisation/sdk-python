@@ -6,6 +6,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — versioning 
 
 ---
 
+## [1.0.0] — 2026-05-15
+
+### Fixed
+
+- `/api/summary` now returns a flat response structure (`calls_24h`, `error_rate_24h`, `avg_p90_24h`, `active_routes`) matching the React dashboard frontend — fixes "0 requests" display
+
+### Added
+
+- `/api/global-timeseries` endpoint consumed by the dashboard overview chart
+- `/api/releases` endpoint (returns `[]` for now — release tracking planned)
+
+### Changed
+
+- Dashboard UI now loads React and Babel from jsDelivr CDN instead of local assets, making `ui.html` SDK-agnostic
+
+---
+
 ## [0.1.0] — 2026-05-15
 
 ### Added
@@ -22,4 +39,5 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — versioning 
 - Configurable sampling rate, ignored paths, environment label, release tag and service name
 - `middleware.shutdown()` for graceful teardown (flushes buffer, closes SQLite)
 
+[1.0.0]: https://github.com/APIForge-Organisation/sdk-python/releases/tag/v1.0.0
 [0.1.0]: https://github.com/APIForge-Organisation/sdk-python/releases/tag/v0.1.0

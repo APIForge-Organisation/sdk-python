@@ -3,7 +3,7 @@
 **API observability & intelligence for FastAPI/Starlette — local-first, privacy-first.**
 
 [![PyPI version](https://img.shields.io/pypi/v/apiforgepy?color=0066FF)](https://pypi.org/project/apiforgepy/)
-[![CI](https://img.shields.io/github/actions/workflow/status/APIForge-Organisation/sdk-python/ci.yml?branch=dev&label=CI)](https://github.com/APIForge-Organisation/sdk-python/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/APIForge-Organisation/sdk-python/ci.yml?branch=main&label=CI)](https://github.com/APIForge-Organisation/sdk-python/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-brightgreen)](https://python.org)
 

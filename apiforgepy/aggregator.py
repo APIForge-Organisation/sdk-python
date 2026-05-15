@@ -78,6 +78,7 @@ class Aggregator:
             n = len(sorted_d)
             sizes = bucket["response_sizes"]
             bytes_avg = sum(sizes) / len(sizes) if sizes else None
+            lat_avg = sum(bucket["durations"]) / n if n > 0 else None
             rows.append({
                 "bucket_ts":   bucket_ts,
                 "route":       bucket["route"],
@@ -91,6 +92,7 @@ class Aggregator:
                 "lat_p50":     _percentile(sorted_d, 0.50),
                 "lat_p90":     _percentile(sorted_d, 0.90),
                 "lat_p99":     _percentile(sorted_d, 0.99),
+                "lat_avg":     lat_avg,
                 "lat_min":     sorted_d[0] if sorted_d else 0,
                 "lat_max":     sorted_d[-1] if sorted_d else 0,
                 "bytes_avg":   bytes_avg,

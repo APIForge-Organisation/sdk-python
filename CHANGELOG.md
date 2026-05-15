@@ -6,6 +6,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — versioning 
 
 ---
 
+## [1.0.3] — 2026-05-15
+
+### Added
+
+- `DRIFT` insight type: detects progressive latency degradation using ordinary least squares over the last 30 days — emitted when slope ≥ 5ms/day over 7+ data points, with a 30-day projection
+- `DRIFT` filter chip added to the dashboard Insights view
+- 60 unit tests covering `aggregator`, `database`, `insights` and `middleware`
+
+### Fixed
+
+- CI badge was pointing to `main` with no workflow run — CI now triggers on both `main` and `dev`
+
+---
+
 ## [1.0.0] — 2026-05-15
 
 ### Fixed

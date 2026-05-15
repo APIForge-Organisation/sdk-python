@@ -254,6 +254,21 @@ class ApiForgeDatabase:
         """).fetchall()
         return [dict(r) for r in rows]
 
+    def get_drift_data(self) -> list[dict]:
+        """Returns one row per (route, method, day) over the last 30 days for drift detection."""
+        since_30d = _now_sec() - 30 * 86_400
+        rows = self._conn.execute("""
+            SELECT
+                route, method,
+                CAST(bucket_ts / 86400 AS INTEGER) as day_bucket,
+                AVG(lat_p90) as p90
+            FROM api_metrics
+            WHERE bucket_ts >= ? AND lat_p90 IS NOT NULL
+            GROUP BY route, method, day_bucket
+            ORDER BY route, method, day_bucket
+        """, (since_30d,)).fetchall()
+        return [dict(r) for r in rows]
+
     def get_global_time_series(self, hours: int = 24) -> list[dict]:
         since = _now_sec() - hours * 3600
         rows = self._conn.execute("""

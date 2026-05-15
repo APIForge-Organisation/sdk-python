@@ -1250,8 +1250,9 @@ function Insights({ setRoute, setParams }) {
 
   const types = [
     {id:'ALL',label:'All'},{id:'PERF',label:'Performance'},
-    {id:'ANOMALY',label:'Anomaly'},{id:'DEAD',label:'Dead'},
-    {id:'UNTRACKED',label:'Untracked'},{id:'OK',label:'OK'},
+    {id:'DRIFT',label:'Drift'},{id:'ANOMALY',label:'Anomaly'},
+    {id:'DEAD',label:'Dead'},{id:'UNTRACKED',label:'Untracked'},
+    {id:'OK',label:'OK'},
   ];
   const filtered = INSIGHTS.filter(i =>
     (typeFilter === 'ALL' || i.type === typeFilter) &&

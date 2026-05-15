@@ -75,6 +75,17 @@ class ApiForgeDatabase:
                 INSERT INTO known_routes (route, method) VALUES (?, ?)
                 ON CONFLICT (route, method) DO NOTHING
             """, [(r["route"], r["method"]) for r in routes])
+            if routes:
+                keys = [f"{r['route']}|{r['method']}" for r in routes]
+                ph   = ",".join("?" * len(keys))
+                self._conn.execute(f"""
+                    DELETE FROM known_routes
+                    WHERE route || '|' || method NOT IN ({ph})
+                      AND NOT EXISTS (
+                        SELECT 1 FROM api_metrics m
+                        WHERE m.route = known_routes.route AND m.method = known_routes.method
+                      )
+                """, keys)
             self._conn.commit()
 
     def get_summary(self) -> dict:
@@ -223,6 +234,23 @@ class ApiForgeDatabase:
                 WHERE m.route = k.route AND m.method = k.method
             )
             ORDER BY k.method, k.route
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_releases(self) -> list[dict]:
+        rows = self._conn.execute("""
+            WITH release_times AS (
+                SELECT release_tag, MIN(bucket_ts) AS release_ts
+                FROM api_metrics
+                WHERE release_tag IS NOT NULL AND release_tag != ''
+                GROUP BY release_tag
+            )
+            SELECT rt.release_tag,
+                   rt.release_ts,
+                   (SELECT COUNT(*) FROM known_routes WHERE first_seen <= rt.release_ts + 60) AS routes_affected
+            FROM release_times rt
+            ORDER BY rt.release_ts DESC
+            LIMIT 20
         """).fetchall()
         return [dict(r) for r in rows]
 

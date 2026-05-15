@@ -1,9 +1,11 @@
 import math
 import time
 
-DEAD_ENDPOINT_DAYS   = 21
-REGRESSION_THRESHOLD = 0.20
-ANOMALY_Z_THRESHOLD  = 2.5
+DEAD_ENDPOINT_DAYS    = 21
+REGRESSION_THRESHOLD  = 0.20
+ANOMALY_Z_THRESHOLD   = 2.5
+DRIFT_SLOPE_THRESHOLD = 5.0   # ms/day above which progressive drift is reported
+DRIFT_MIN_DAYS        = 7     # minimum number of daily data points required
 
 
 def get_insights(db) -> list[dict]:
@@ -13,6 +15,7 @@ def get_insights(db) -> list[dict]:
         _detect_dead_endpoints,
         _detect_release_regressions,
         _detect_untracked_routes,
+        _detect_drift,
     ):
         try:
             insights.extend(fn(db))
@@ -157,6 +160,67 @@ def _detect_release_regressions(db) -> list[dict]:
                 ),
                 "data": {"release": release_tag, "before_p90": b["avg_p90"], "after_p90": a["avg_p90"], "delta_pct": delta * 100},
             })
+    return insights
+
+
+def _detect_drift(db) -> list[dict]:
+    rows = db.get_drift_data()
+    if not rows:
+        return []
+
+    # Group daily P90 samples by endpoint
+    by_endpoint: dict[str, dict] = {}
+    for row in rows:
+        key = f"{row['method']}|{row['route']}"
+        if key not in by_endpoint:
+            by_endpoint[key] = {"method": row["method"], "route": row["route"], "points": []}
+        by_endpoint[key]["points"].append({"x": row["day_bucket"], "y": row["p90"]})
+
+    insights = []
+    for ep in by_endpoint.values():
+        points = ep["points"]
+        if len(points) < DRIFT_MIN_DAYS:
+            continue
+
+        # Ordinary least squares on (day_index, p90) pairs
+        x0   = points[0]["x"]
+        xs   = [p["x"] - x0 for p in points]
+        ys   = [p["y"] for p in points]
+        n    = len(xs)
+        sum_x  = sum(xs)
+        sum_y  = sum(ys)
+        sum_xy = sum(xs[i] * ys[i] for i in range(n))
+        sum_x2 = sum(x * x for x in xs)
+        denom  = n * sum_x2 - sum_x ** 2
+        if denom == 0:
+            continue
+
+        slope = (n * sum_xy - sum_x * sum_y) / denom
+        if slope < DRIFT_SLOPE_THRESHOLD:
+            continue
+
+        observed_days = xs[-1]
+        projection_30 = round(slope * 30)
+        method, route = ep["method"], ep["route"]
+        day_str = "day" if observed_days == 1 else "days"
+
+        insights.append({
+            "type":     "DRIFT",
+            "severity": "warning",
+            "route":    route,
+            "method":   method,
+            "message":  (
+                f"`{method} {route}` has been progressively degrading for "
+                f"{observed_days} {day_str}: +{slope:.1f}ms/day. "
+                f"30-day projection: +{projection_30}ms."
+            ),
+            "data": {
+                "slope_ms_per_day": slope,
+                "observed_days": observed_days,
+                "projection_30d_ms": projection_30,
+            },
+        })
+
     return insights
 
 

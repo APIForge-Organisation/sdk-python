@@ -1,5 +1,8 @@
 import json
+import os
+import sys
 import threading
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -14,6 +17,10 @@ _HTML = """\
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>APIForge — Local Dashboard</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230a0a0a'/><text x='16' y='22' text-anchor='middle' fill='white' font-size='14' font-family='monospace' font-weight='bold'>AF</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" /></noscript>
   <style>
 /* APIForge Local Dashboard */
 :root {
@@ -26,13 +33,18 @@ _HTML = """\
   --warn: #b45309; --warn-soft: rgba(180,83,9,0.09);
   --danger: #b91c1c; --danger-soft: rgba(185,28,28,0.08);
   --info: #2563eb; --info-soft: rgba(37,99,235,0.08); --neutral: #525252;
+  --method-GET: #1d4ed8; --method-POST: #15803d; --method-PUT: #b45309;
+  --method-PATCH: #6d28d9; --method-DELETE: #b91c1c;
+  --ai-grad: linear-gradient(135deg, #7c3aed, #be185d);
   --row-h: 40px; --pad-card: 20px;
-  --radius-sm: 5px; --radius: 8px; --radius-lg: 12px;
+  --radius-xs: 3px; --radius-sm: 5px; --radius: 8px; --radius-lg: 12px; --radius-pill: 999px;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
   --shadow: 0 4px 16px rgba(0,0,0,0.06);
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
-  --sans: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --mono: 'Geist Mono','JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --ease: cubic-bezier(0.2, 0.9, 0.4, 1);
+  --dur-fast: 0.1s; --dur: 0.15s; --dur-slow: 0.3s;
+  --sans: 'Geist', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; }
@@ -105,6 +117,15 @@ body { font-family: var(--sans); font-size: 13px; line-height: 1.45; color: var(
 .btn-ghost:hover { background: var(--bg-elev); }
 .btn-danger { color: var(--danger); border-color: var(--border); }
 .btn-danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+.btn-accent { background: var(--accent); color: white; border-color: var(--accent); }
+.btn-accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.status-badge { font-family: var(--mono); font-size: 10px; font-weight: 600;
+  padding: 2px 6px; border-radius: var(--radius-xs); text-transform: uppercase;
+  letter-spacing: 0.04em; display: inline-block; }
+.sb-ok   { background: var(--ok-soft);     color: var(--ok); }
+.sb-warn { background: var(--warn-soft);   color: var(--warn); }
+.sb-bad  { background: var(--danger-soft); color: var(--danger); }
+.sb-info { background: var(--info-soft);   color: var(--info); }
 
 .content { flex: 1; overflow-y: auto; background: var(--bg); }
 .content-inner { max-width: 1400px; margin: 0 auto; padding: 24px 32px 48px; }
@@ -161,7 +182,7 @@ body { font-family: var(--sans); font-size: 13px; line-height: 1.45; color: var(
 .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase;
   letter-spacing: 0.06em; font-weight: 500; }
 .stat-val { font-size: 22px; font-weight: 600; font-family: var(--mono);
-  letter-spacing: -0.5px; margin-top: 6px; display: flex; align-items: baseline; gap: 6px; }
+  font-feature-settings: 'tnum'; letter-spacing: -0.5px; margin-top: 6px; display: flex; align-items: baseline; gap: 6px; }
 .stat-val .unit { font-size: 12px; color: var(--text-dim); font-weight: 400; }
 .stat-delta { font-size: 11.5px; font-family: var(--mono); margin-top: 4px;
   display: inline-flex; align-items: center; gap: 3px; color: var(--text-dim); }
@@ -179,7 +200,7 @@ body { font-family: var(--sans); font-size: 13px; line-height: 1.45; color: var(
 .tbl tr:last-child td { border-bottom: 0; }
 .tbl tr.click { cursor: pointer; }
 .tbl tr.click:hover td { background: var(--bg-elev); }
-.tbl td.num, .tbl th.num { text-align: right; font-family: var(--mono); }
+.tbl td.num, .tbl th.num { text-align: right; font-family: var(--mono); font-feature-settings: 'tnum'; }
 
 .method { font-family: var(--mono); font-size: 10.5px; font-weight: 600; padding: 2px 6px;
   border-radius: 3px; letter-spacing: 0.02em; display: inline-block; min-width: 44px; text-align: center; }
@@ -324,9 +345,9 @@ input.fld:focus { outline: 2px solid var(--accent-line); border-color: var(--acc
 <body>
   <div id="root"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js" crossorigin></script>
+  <script src="/assets/react.js"></script>
+  <script src="/assets/react-dom.js"></script>
+  <script src="/assets/babel.js"></script>
 
   <script type="text/babel" data-presets="react">
 'use strict';
@@ -1666,6 +1687,36 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 """
 # <<DASHBOARD_UI_END>>
 
+_ASSET_URLS = {
+    "react.js":     "https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js",
+    "react-dom.js": "https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js",
+    "babel.js":     "https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js",
+}
+
+
+def _asset_cache_dir() -> str:
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    else:
+        base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(base, "apiforgepy", "assets")
+
+
+def _ensure_assets() -> None:
+    """Download JS runtime assets to local cache on first startup (one-time, ~1.5 MB)."""
+    directory = _asset_cache_dir()
+    os.makedirs(directory, exist_ok=True)
+    for name, url in _ASSET_URLS.items():
+        path = os.path.join(directory, name)
+        if not os.path.exists(path):
+            try:
+                with urllib.request.urlopen(url, timeout=20) as resp:
+                    data = resp.read()
+                with open(path, "wb") as f:
+                    f.write(data)
+            except Exception:
+                pass  # Endpoint returns 503 until downloaded
+
 
 def _make_handler(db):
     class Handler(BaseHTTPRequestHandler):
@@ -1715,6 +1766,14 @@ def _make_handler(db):
                 self._json(db.get_releases() if hasattr(db, "get_releases") else [])
             elif path == "/api/insights":
                 self._json(get_insights(db))
+            elif path.startswith("/assets/"):
+                name = path[len("/assets/"):]
+                asset_path = os.path.join(_asset_cache_dir(), name)
+                if name in _ASSET_URLS and os.path.exists(asset_path):
+                    with open(asset_path, "rb") as f:
+                        self._respond(200, "application/javascript", f.read())
+                else:
+                    self._respond(503, "text/plain", b"Asset downloading, retry in a moment")
             else:
                 self._respond(404, "text/plain", b"Not found")
 
@@ -1734,8 +1793,10 @@ def _make_handler(db):
 
 
 def start_dashboard(db, port: int):
+    _ensure_assets()
     handler = _make_handler(db)
-    server = ThreadingHTTPServer(("0.0.0.0", port), handler)
+    server = ThreadingHTTPServer(("127.0.0.1", port), handler)
+    server.daemon_threads = True  # request handler threads don't block process exit
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server

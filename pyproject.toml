@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "apiforgepy"
-version = "2.0.0"
+version = "2.1.0"
 
 description = "API observability & intelligence for FastAPI/Starlette — local-first, privacy-first"
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "APIForge", email = "contact@apiforge.dev" }]
+authors = [{ name = "APIForge" }]
 keywords = ["api", "observability", "monitoring", "fastapi", "starlette", "metrics", "performance", "middleware", "local-first"]
 classifiers = [
     "Development Status :: 3 - Alpha",

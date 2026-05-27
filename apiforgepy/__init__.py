@@ -14,6 +14,7 @@ Usage (cloud):
     )
 """
 
+import atexit
 import os
 
 from .aggregator       import Aggregator
@@ -23,7 +24,7 @@ from .middleware       import ApiForgeMiddleware as _Base
 from .transport        import LocalTransport
 from .cloud_transport  import CloudTransport
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __all__ = ["ApiForgeMiddleware"]
 
 
@@ -75,7 +76,9 @@ class ApiForgeMiddleware(_Base):
             "ignore_paths": ignore_paths or ["/favicon.ico"],
         }
 
-        self._db = None
+        self._db               = None
+        self._dashboard_server = None
+        self._stopped          = False
 
         if is_cloud:
             transport = CloudTransport(cloud_url, api_key, service)
@@ -87,13 +90,35 @@ class ApiForgeMiddleware(_Base):
         aggregator.start()
 
         if not is_cloud and dashboard_port:
-            start_dashboard(self._db, dashboard_port)
+            self._dashboard_server = start_dashboard(self._db, dashboard_port)
 
         self._aggregator_ref = aggregator
         super().__init__(app, aggregator=aggregator, config=config)
 
-    def shutdown(self):
-        """Flush remaining buffer and close resources."""
-        self._aggregator_ref.stop()
+        atexit.register(self._cleanup)
+
+    def _cleanup(self) -> None:
+        """Flush buffer and close DB — safe to call multiple times (via atexit or shutdown)."""
+        if self._stopped:
+            return
+        self._stopped = True
+        try:
+            self._aggregator_ref.stop()
+        except Exception:
+            pass
         if self._db:
-            self._db.close()
+            try:
+                self._db.close()
+            except Exception:
+                pass
+
+    def shutdown(self) -> None:
+        """Flush remaining buffer, stop dashboard, and release all resources."""
+        self._cleanup()
+        if self._dashboard_server:
+            try:
+                self._dashboard_server.shutdown()
+                self._dashboard_server.server_close()
+            except Exception:
+                pass
+            self._dashboard_server = None

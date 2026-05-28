@@ -1,6 +1,7 @@
 import re
 import time
 import os
+import threading
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -15,18 +16,51 @@ def _normalize_path(path: str) -> str:
     return path
 
 
+def _extract_routes(app) -> list[dict]:
+    """Walk a FastAPI/Starlette app's router and return all declared routes."""
+    from starlette.routing import Route, Mount
+    routes = []
+
+    def walk(route_list, prefix: str = ""):
+        for r in route_list:
+            if isinstance(r, Route) and r.methods:
+                for method in r.methods:
+                    # HEAD is auto-added by Starlette for every GET route — skip it
+                    if method != "HEAD":
+                        routes.append({"route": prefix + r.path, "method": method})
+            elif isinstance(r, Mount) and hasattr(r, "routes"):
+                walk(r.routes, prefix + (r.path or ""))
+
+    try:
+        walk(getattr(app, "routes", []))
+    except Exception:
+        pass
+
+    return routes
+
+
 class ApiForgeMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, *, aggregator, config: dict):
         super().__init__(app)
-        self._aggregator = aggregator
-        self._env        = config["env"]
-        self._release    = config.get("release")
-        self._service    = config["service"]
-        self._sampling   = config["sampling"]
-        self._ignore     = set(config["ignore_paths"])
+        self._aggregator    = aggregator
+        self._env           = config["env"]
+        self._release       = config.get("release")
+        self._service       = config["service"]
+        self._sampling      = config["sampling"]
+        self._ignore        = set(config["ignore_paths"])
+        self._store_routes  = config.get("store_routes")
+        self._routes_scanned = False
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
+
+        if not self._routes_scanned and self._store_routes:
+            self._routes_scanned = True
+            routes = _extract_routes(request.app)
+            if routes:
+                threading.Thread(
+                    target=self._store_routes, args=(routes,), daemon=True
+                ).start()
 
         if path in self._ignore:
             return await call_next(request)

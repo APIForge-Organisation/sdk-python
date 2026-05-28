@@ -24,7 +24,7 @@ from .middleware       import ApiForgeMiddleware as _Base
 from .transport        import LocalTransport
 from .cloud_transport  import CloudTransport
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 __all__ = ["ApiForgeMiddleware"]
 
 
@@ -82,9 +82,11 @@ class ApiForgeMiddleware(_Base):
 
         if is_cloud:
             transport = CloudTransport(cloud_url, api_key, service)
+            config["store_routes"] = transport.write_routes
         else:
             self._db  = ApiForgeDatabase(db_path)
             transport = LocalTransport(self._db)
+            config["store_routes"] = self._db.upsert_known_routes
 
         aggregator = Aggregator(transport, flush_interval)
         aggregator.start()

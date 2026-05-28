@@ -20,6 +20,27 @@ class CloudTransport:
         self._open_until = 0.0
         self._lock = threading.Lock()
 
+    def write_routes(self, routes: list[dict]) -> None:
+        if not routes:
+            return
+        payload = json.dumps({
+            "routes": [
+                {"route": r["route"], "method": r["method"], "service": self._service}
+                for r in routes
+            ]
+        }).encode()
+        req = urllib.request.Request(
+            self._url + "/routes",
+            data=payload,
+            headers={"Content-Type": "application/json", "X-API-Key": self._api_key},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10):
+                pass
+        except (urllib.error.URLError, OSError) as exc:
+            print(f"[apiforgepy] Failed to sync route registry: {exc}")
+
     def write(self, rows: list[dict]) -> None:
         if not rows:
             return

@@ -1,3 +1,4 @@
+import json
 import time
 import pytest
 from apiforgepy.database import ApiForgeDatabase
@@ -15,15 +16,24 @@ def insert_row(db, **overrides):
         env="test",
         release_tag=None,
         status_2xx=1,
+        status_3xx=0,
         status_4xx=0,
         status_5xx=0,
+        status_dist=None,
         total_calls=1,
         lat_p50=50.0,
         lat_p90=90.0,
         lat_p99=99.0,
+        lat_avg=70.0,
         lat_min=10.0,
         lat_max=150.0,
+        lat_ttfb_p50=None,
+        lat_ttfb_p90=None,
+        lat_ttfb_p99=None,
         bytes_avg=None,
+        request_size_avg=None,
+        inflight_avg=None,
+        inflight_max=None,
         is_ghost=0,
     )
     db.insert_batch([{**defaults, **overrides}])
@@ -79,6 +89,14 @@ class TestGetSummary:
         assert s["recent"]["calls_5xx"] == 3
         db.close()
 
+    def test_exposes_calls_3xx_in_summary(self):
+        db = make_db()
+        now = int(time.time())
+        insert_row(db, status_2xx=0, status_3xx=4, total_calls=4, bucket_ts=now)
+        s = db.get_summary()
+        assert s["recent"]["calls_3xx"] == 4
+        db.close()
+
 
 class TestGetTimeSeries:
     def test_returns_data_for_matching_route(self):
@@ -95,6 +113,14 @@ class TestGetTimeSeries:
         insert_row(db, route="/other")
         rows = db.get_time_series("/missing", "GET", 24)
         assert rows == []
+        db.close()
+
+    def test_includes_redirects_column(self):
+        db = make_db()
+        ts = int(time.time()) - 60
+        insert_row(db, route="/redir", method="GET", bucket_ts=ts, status_3xx=2)
+        rows = db.get_time_series("/redir", "GET", 24)
+        assert rows[0]["redirects"] == 2
         db.close()
 
 
@@ -191,4 +217,54 @@ class TestBytesAvg:
         insert_row(db, route="/nosize", bytes_avg=None)
         routes = db.get_routes(24)
         assert routes[0]["bytes_avg"] is None
+        db.close()
+
+
+class TestNewColumns:
+    def test_stores_and_returns_status_3xx(self):
+        db = make_db()
+        insert_row(db, route="/redir", status_2xx=0, status_3xx=5, total_calls=5)
+        routes = db.get_routes(24)
+        assert routes[0]["calls_3xx"] == 5
+        db.close()
+
+    def test_stores_and_retrieves_status_dist(self):
+        db = make_db()
+        dist = json.dumps({200: 10, 201: 2})
+        insert_row(db, route="/dist", status_dist=dist)
+        row = db._conn.execute("SELECT status_dist FROM api_metrics LIMIT 1").fetchone()
+        assert json.loads(row["status_dist"]) == json.loads(dist)
+        db.close()
+
+    def test_stores_and_returns_lat_avg(self):
+        db = make_db()
+        insert_row(db, route="/avg", lat_avg=42.5)
+        row = db._conn.execute("SELECT lat_avg FROM api_metrics LIMIT 1").fetchone()
+        assert row["lat_avg"] == pytest.approx(42.5)
+        db.close()
+
+    def test_stores_and_returns_lat_ttfb(self):
+        db = make_db()
+        insert_row(db, route="/ttfb", lat_ttfb_p50=12.0, lat_ttfb_p90=25.0, lat_ttfb_p99=40.0)
+        row = db._conn.execute(
+            "SELECT lat_ttfb_p50, lat_ttfb_p90, lat_ttfb_p99 FROM api_metrics LIMIT 1"
+        ).fetchone()
+        assert row["lat_ttfb_p50"] == pytest.approx(12.0)
+        assert row["lat_ttfb_p90"] == pytest.approx(25.0)
+        assert row["lat_ttfb_p99"] == pytest.approx(40.0)
+        db.close()
+
+    def test_stores_and_returns_request_size_avg(self):
+        db = make_db()
+        insert_row(db, route="/upload", request_size_avg=1024.0)
+        routes = db.get_routes(24)
+        assert routes[0]["request_size_avg"] == pytest.approx(1024.0)
+        db.close()
+
+    def test_stores_and_returns_inflight(self):
+        db = make_db()
+        insert_row(db, route="/busy", inflight_avg=4.5, inflight_max=8)
+        routes = db.get_routes(24)
+        assert routes[0]["inflight_avg"] == pytest.approx(4.5)
+        assert routes[0]["inflight_max"] == 8
         db.close()

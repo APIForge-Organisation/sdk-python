@@ -24,6 +24,7 @@ def insert_row(db, **overrides):
         lat_min=10.0,
         lat_max=150.0,
         bytes_avg=None,
+        is_ghost=0,
     )
     db.insert_batch([{**defaults, **overrides}])
 

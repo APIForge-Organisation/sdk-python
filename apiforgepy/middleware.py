@@ -92,6 +92,7 @@ class ApiForgeMiddleware(BaseHTTPMiddleware):
                 "release":       self._release,
                 "service":       self._service,
                 "response_size": int(content_length) if content_length else None,
+                "is_ghost":      route_obj is None,
             })
         except Exception:
             pass  # never crash the host application

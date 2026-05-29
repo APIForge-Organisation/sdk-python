@@ -43,7 +43,8 @@ class ApiForgeDatabase:
                 lat_p99     REAL,
                 lat_min     REAL,
                 lat_max     REAL,
-                bytes_avg   REAL
+                bytes_avg   REAL,
+                is_ghost    INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE INDEX IF NOT EXISTS idx_route_ts  ON api_metrics (route, method, bucket_ts);
@@ -51,11 +52,15 @@ class ApiForgeDatabase:
             CREATE INDEX IF NOT EXISTS idx_release   ON api_metrics (release_tag)
                 WHERE release_tag IS NOT NULL;
         """)
-        # Migration for databases created before bytes_avg was introduced
+        # Migrations for databases created before these columns were introduced
         try:
             c.execute("ALTER TABLE api_metrics ADD COLUMN bytes_avg REAL")
         except Exception:
-            pass  # column already exists
+            pass
+        try:
+            c.execute("ALTER TABLE api_metrics ADD COLUMN is_ghost INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass
         c.commit()
 
     def insert_batch(self, rows: list[dict]):
@@ -66,11 +71,11 @@ class ApiForgeDatabase:
                 INSERT INTO api_metrics
                     (bucket_ts, route, method, env, release_tag,
                      status_2xx, status_4xx, status_5xx, total_calls,
-                     lat_p50, lat_p90, lat_p99, lat_min, lat_max, bytes_avg)
+                     lat_p50, lat_p90, lat_p99, lat_min, lat_max, bytes_avg, is_ghost)
                 VALUES (
                     :bucket_ts, :route, :method, :env, :release_tag,
                     :status_2xx, :status_4xx, :status_5xx, :total_calls,
-                    :lat_p50, :lat_p90, :lat_p99, :lat_min, :lat_max, :bytes_avg
+                    :lat_p50, :lat_p90, :lat_p99, :lat_min, :lat_max, :bytes_avg, :is_ghost
                 )
             """, rows)
             self._conn.commit()
@@ -107,22 +112,22 @@ class ApiForgeDatabase:
                 SUM(status_5xx)  as calls_5xx,
                 AVG(lat_p90)     as avg_p90,
                 AVG(lat_p99)     as avg_p99
-            FROM api_metrics WHERE bucket_ts >= ?
+            FROM api_metrics WHERE bucket_ts >= ? AND is_ghost = 0
         """, (since_24h,)).fetchone()
 
         baseline = c.execute("""
             SELECT AVG(lat_p90) as baseline_p90
-            FROM api_metrics WHERE bucket_ts >= ? AND bucket_ts < ?
+            FROM api_metrics WHERE bucket_ts >= ? AND bucket_ts < ? AND is_ghost = 0
         """, (since_7d, since_24h)).fetchone()
 
         active = c.execute("""
             SELECT COUNT(DISTINCT route || '|' || method) as n
-            FROM api_metrics WHERE bucket_ts >= ?
+            FROM api_metrics WHERE bucket_ts >= ? AND is_ghost = 0
         """, (since_24h,)).fetchone()
 
         total = c.execute("""
             SELECT COUNT(DISTINCT route || '|' || method) as n
-            FROM api_metrics
+            FROM api_metrics WHERE is_ghost = 0
         """).fetchone()
 
         return {
@@ -136,7 +141,7 @@ class ApiForgeDatabase:
         since = _now_sec() - hours * 3600
         rows = self._conn.execute("""
             SELECT
-                route, method,
+                route, method, is_ghost,
                 SUM(total_calls) as calls,
                 SUM(status_2xx)  as calls_2xx,
                 SUM(status_4xx)  as calls_4xx,
@@ -148,9 +153,9 @@ class ApiForgeDatabase:
                 AVG(bytes_avg)   as bytes_avg
             FROM api_metrics
             WHERE bucket_ts >= ?
-            GROUP BY route, method
-            ORDER BY calls DESC
-            LIMIT 50
+            GROUP BY route, method, is_ghost
+            ORDER BY is_ghost ASC, calls DESC
+            LIMIT 100
         """, (since,)).fetchall()
         return [dict(r) for r in rows]
 
@@ -171,6 +176,7 @@ class ApiForgeDatabase:
         rows = self._conn.execute("""
             SELECT route, method, MAX(bucket_ts) as last_seen
             FROM api_metrics
+            WHERE is_ghost = 0
             GROUP BY route, method
             HAVING last_seen < ?
             ORDER BY last_seen ASC
@@ -217,14 +223,14 @@ class ApiForgeDatabase:
 
         recent = self._conn.execute("""
             SELECT route, method, AVG(lat_p99) as avg_p99
-            FROM api_metrics WHERE bucket_ts >= ?
+            FROM api_metrics WHERE bucket_ts >= ? AND is_ghost = 0
             GROUP BY route, method
         """, (since_1h,)).fetchall()
 
         baseline = self._conn.execute("""
             SELECT route, method, lat_p99
             FROM api_metrics
-            WHERE bucket_ts >= ? AND bucket_ts < ? AND lat_p99 IS NOT NULL
+            WHERE bucket_ts >= ? AND bucket_ts < ? AND lat_p99 IS NOT NULL AND is_ghost = 0
         """, (since_7d, since_1h)).fetchall()
 
         return {
@@ -270,7 +276,7 @@ class ApiForgeDatabase:
                 CAST(bucket_ts / 86400 AS INTEGER) as day_bucket,
                 AVG(lat_p90) as p90
             FROM api_metrics
-            WHERE bucket_ts >= ? AND lat_p90 IS NOT NULL
+            WHERE bucket_ts >= ? AND lat_p90 IS NOT NULL AND is_ghost = 0
             GROUP BY route, method, day_bucket
             ORDER BY route, method, day_bucket
         """, (since_30d,)).fetchall()
@@ -282,7 +288,7 @@ class ApiForgeDatabase:
             SELECT bucket_ts, SUM(total_calls) as calls,
                    AVG(lat_p50) as p50, AVG(lat_p90) as p90,
                    AVG(lat_p99) as p99, SUM(status_5xx) as errors
-            FROM api_metrics WHERE bucket_ts >= ?
+            FROM api_metrics WHERE bucket_ts >= ? AND is_ghost = 0
             GROUP BY bucket_ts ORDER BY bucket_ts ASC
         """, (since,)).fetchall()
         return [dict(r) for r in rows]

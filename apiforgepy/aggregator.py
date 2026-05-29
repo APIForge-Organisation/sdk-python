@@ -28,7 +28,8 @@ class Aggregator:
         self._flush()
 
     def record(self, event: dict):
-        key = f"{event['method']}|{event['route']}|{event['env']}|{event.get('release') or ''}"
+        is_ghost = event.get("is_ghost", False)
+        key = f"{event['method']}|{event['route']}|{event['env']}|{event.get('release') or ''}|{'1' if is_ghost else '0'}"
         with self._lock:
             if key not in self._buffer:
                 self._buffer[key] = {
@@ -36,6 +37,7 @@ class Aggregator:
                     "route":          event["route"],
                     "env":            event["env"],
                     "release":        event.get("release"),
+                    "is_ghost":       is_ghost,
                     "durations":      [],
                     "response_sizes": [],
                     "status_2xx":     0,
@@ -85,6 +87,7 @@ class Aggregator:
                 "method":      bucket["method"],
                 "env":         bucket["env"],
                 "release_tag": bucket["release"],
+                "is_ghost":    1 if bucket["is_ghost"] else 0,
                 "status_2xx":  bucket["status_2xx"],
                 "status_4xx":  bucket["status_4xx"],
                 "status_5xx":  bucket["status_5xx"],

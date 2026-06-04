@@ -55,7 +55,6 @@ app.add_middleware(
     ApiForgeMiddleware,
     db_path=".apiforge.db",
     dashboard_port=4242,        # set to 0 to disable
-    flush_interval=60_000,      # aggregate and flush every 60s (ms)
     env="production",
     release="v1.4.0",           # enables release regression detection
     service="user-service",

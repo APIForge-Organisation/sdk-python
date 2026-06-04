@@ -11,7 +11,7 @@ def make_app(db_path=":memory:", sampling=1.0, ignore_paths=None):
         ApiForgeMiddleware,
         db_path=db_path,
         dashboard_port=0,
-        flush_interval=999_999,
+        _flush_interval=999_999,
         sampling=sampling,
         ignore_paths=ignore_paths or [],
     )

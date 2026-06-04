@@ -15,7 +15,6 @@ Usage (cloud):
 """
 
 import atexit
-import os
 
 from .aggregator       import Aggregator
 from .database         import ApiForgeDatabase
@@ -24,7 +23,7 @@ from .middleware       import ApiForgeMiddleware as _Base
 from .transport        import LocalTransport
 from .cloud_transport  import CloudTransport
 
-__version__ = "2.2.1"
+__version__ = "3.0.0"
 __all__ = ["ApiForgeMiddleware"]
 
 
@@ -39,9 +38,8 @@ class ApiForgeMiddleware(_Base):
     api_key:        Cloud mode: project API key starting with 'af_'.
     db_path:        Local mode: SQLite file path. Default: '.apiforge.db'.
     dashboard_port: Local mode: dashboard port. 0 = disabled. Default: 4242.
-    flush_interval: Aggregation flush interval in ms. Default: 60 000.
-    env:            Environment label. Default: ENV env var or 'production'.
-    release:        Release tag. Default: APP_VERSION env var.
+    env:            Environment label. Default: 'production'.
+    release:        Release tag. Default: None.
     service:        Service name. Default: 'default'.
     sampling:       Sample rate 0.0–1.0. Default: 1.0.
     ignore_paths:   Paths to exclude. Default: ['/favicon.ico'].
@@ -55,12 +53,12 @@ class ApiForgeMiddleware(_Base):
         api_key:        str | None = None,
         db_path:        str        = ".apiforge.db",
         dashboard_port: int        = 4242,
-        flush_interval: int        = 60_000,
         env:            str | None = None,
         release:        str | None = None,
         service:        str        = "default",
         sampling:       float      = 1.0,
         ignore_paths:   list[str]  = None,
+        _flush_interval: int       = 60_000,  # internal — not part of the public API
     ):
         is_cloud = bool(cloud_url and api_key)
 
@@ -69,8 +67,8 @@ class ApiForgeMiddleware(_Base):
 
         config = {
             "mode":         "cloud" if is_cloud else "local",
-            "env":          env or os.environ.get("ENV", "production"),
-            "release":      release or os.environ.get("APP_VERSION"),
+            "env":          env or "production",
+            "release":      release,
             "service":      service,
             "sampling":     sampling,
             "ignore_paths": ignore_paths or ["/favicon.ico"],
@@ -88,7 +86,7 @@ class ApiForgeMiddleware(_Base):
             transport = LocalTransport(self._db)
             config["store_routes"] = self._db.upsert_known_routes
 
-        aggregator = Aggregator(transport, flush_interval)
+        aggregator = Aggregator(transport, _flush_interval)
         aggregator.start()
 
         if not is_cloud and dashboard_port:

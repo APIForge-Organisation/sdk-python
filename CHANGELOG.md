@@ -8,10 +8,39 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) — versioning 
 
 ## [Unreleased]
 
+---
+
+## [3.0.0] — 2026-06-04
+
+### Breaking Changes
+
+- `flush_interval` parameter **removed** from `ApiForgeMiddleware` — passing it now raises `TypeError`. The flush window is fixed at **60 seconds**.
+- `env` no longer falls back to `os.environ.get("ENV")` — must be passed explicitly. Default is now `'production'`.
+- `release` no longer falls back to `os.environ.get("APP_VERSION")` — must be passed explicitly. Default is now `None`.
+
 ### Added
 
-- `bytes_avg` field: average response body size (bytes) per route per bucket, sourced from the `Content-Length` response header — stored in SQLite and exposed via `/api/routes`
-- 4 unit tests covering `bytes_avg` aggregation and storage
+- `bytes_avg` field: average response body size (bytes) per route per bucket, sourced from the `Content-Length` response header
+- `inflight_avg` and `inflight_max` per route — inflight concurrency count captured via ASGI scope and aggregated per minute bucket
+
+### Migration guide
+
+```python
+# Before (v2.x)
+app.add_middleware(
+    ApiForgeMiddleware,
+    flush_interval=30_000,                        # ← remove (TypeError in v3)
+    env=os.environ.get("ENV", "production"),       # ← pass explicitly
+    release=os.environ.get("APP_VERSION"),         # ← still OK (your app reads the env var)
+)
+
+# After (v3.0)
+app.add_middleware(
+    ApiForgeMiddleware,
+    env="production",    # set explicitly
+    release="v1.4.0",    # set explicitly
+)
+```
 
 ---
 

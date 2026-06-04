@@ -23,7 +23,7 @@ from .middleware       import ApiForgeMiddleware as _Base
 from .transport        import LocalTransport
 from .cloud_transport  import CloudTransport
 
-__version__ = "2.2.1"
+__version__ = "3.0.0"
 __all__ = ["ApiForgeMiddleware"]
 
 

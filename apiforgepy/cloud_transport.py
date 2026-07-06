@@ -32,7 +32,7 @@ class CloudTransport:
         req = urllib.request.Request(
             self._url + "/routes",
             data=payload,
-            headers={"Content-Type": "application/json", "X-API-Key": self._api_key},
+            headers={"Content-Type": "application/json", "X-APIForge-Key": self._api_key},
             method="POST",
         )
         try:
@@ -83,7 +83,7 @@ class CloudTransport:
         req = urllib.request.Request(
             self._url,
             data=payload,
-            headers={"Content-Type": "application/json", "X-API-Key": self._api_key},
+            headers={"Content-Type": "application/json", "X-APIForge-Key": self._api_key},
             method="POST",
         )
 

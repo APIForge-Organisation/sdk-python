@@ -34,6 +34,7 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
     "uvicorn>=0.29",
+    "ruff>=0.8",
 ]
 
 [project.urls]
@@ -48,3 +49,15 @@ include = ["apiforgepy*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# dashboard.py embeds the dashboard-ui HTML/JS as a Python string (auto-synced,
+# not hand-written), so line-length doesn't apply to it.
+"apiforgepy/dashboard.py" = ["E501"]

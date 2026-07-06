@@ -1,7 +1,6 @@
-import math
 import time
-import pytest
-from apiforgepy.insights import get_insights, compute_health_score
+
+from apiforgepy.insights import compute_health_score, get_insights
 
 
 def make_db(**overrides):
@@ -197,8 +196,6 @@ class TestComputeHealthScore:
         assert score >= 80
 
     def test_returns_none_when_get_summary_raises(self):
-        db = make_db(get_summary=lambda: (_ for _ in ()).throw(RuntimeError("db error")))
-        # Python workaround: use a proper raising function
         class BadDb:
             def get_summary(self):
                 raise RuntimeError("db error")

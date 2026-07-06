@@ -1,9 +1,11 @@
 import re
-import time
 import threading
+import time
 
 _NUMERIC_SEGMENT = re.compile(r"/\d+")
-_UUID_SEGMENT    = re.compile(r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
+_UUID_SEGMENT    = re.compile(
+    r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
+)
 
 
 def _normalize_path(path: str) -> str:
@@ -14,7 +16,7 @@ def _normalize_path(path: str) -> str:
 
 def _extract_routes(app) -> list[dict]:
     """Walk a FastAPI/Starlette app's router and return all declared routes."""
-    from starlette.routing import Route, Mount
+    from starlette.routing import Mount, Route
     routes = []
 
     def walk(route_list, prefix: str = ""):

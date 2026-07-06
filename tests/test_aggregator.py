@@ -1,5 +1,7 @@
 import json
+
 import pytest
+
 from apiforgepy.aggregator import Aggregator
 
 

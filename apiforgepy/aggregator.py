@@ -1,7 +1,7 @@
 import json
+import math
 import threading
 import time
-import math
 
 
 def _percentile(sorted_vals: list[float], p: float) -> float:
@@ -30,7 +30,11 @@ class Aggregator:
 
     def record(self, event: dict):
         is_ghost = event.get("is_ghost", False)
-        key = f"{event['method']}|{event['route']}|{event['env']}|{event.get('release') or ''}|{'1' if is_ghost else '0'}"
+        ghost_flag = "1" if is_ghost else "0"
+        key = (
+            f"{event['method']}|{event['route']}|{event['env']}|"
+            f"{event.get('release') or ''}|{ghost_flag}"
+        )
         with self._lock:
             if key not in self._buffer:
                 self._buffer[key] = {
@@ -63,10 +67,14 @@ class Aggregator:
                 bucket["inflight_samples"].append(event["inflight"])
 
             s = event["status"]
-            if   200 <= s < 300: bucket["status_2xx"] += 1
-            elif 300 <= s < 400: bucket["status_3xx"] += 1
-            elif 400 <= s < 500: bucket["status_4xx"] += 1
-            elif s >= 500:       bucket["status_5xx"] += 1
+            if 200 <= s < 300:
+                bucket["status_2xx"] += 1
+            elif 300 <= s < 400:
+                bucket["status_3xx"] += 1
+            elif 400 <= s < 500:
+                bucket["status_4xx"] += 1
+            elif s >= 500:
+                bucket["status_5xx"] += 1
 
             bucket["status_map"][s] = bucket["status_map"].get(s, 0) + 1
 

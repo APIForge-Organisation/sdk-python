@@ -64,24 +64,19 @@ def test_multiple_methods():
 def test_partial_cloud_config_raises():
     with pytest.raises(ValueError, match="both cloud_url and api_key"):
         app = FastAPI()
-        app.add_middleware(ApiForgeMiddleware, cloud_url="https://api.apiforge.fr", dashboard_port=0)
+        app.add_middleware(
+            ApiForgeMiddleware, cloud_url="https://api.apiforge.fr", dashboard_port=0
+        )
         client = TestClient(app)
         client.get("/")
 
 
 def test_shutdown():
     app = make_app()
-    mw = None
-    for m in app.middleware_stack.__class__.__mro__:
-        pass
-    # Access the middleware instance via the stack
-    stack = app.middleware_stack
     # Walk the stack to find our middleware
-    current = stack
-    found = None
+    current = app.middleware_stack
     for _ in range(10):
         if isinstance(current, ApiForgeMiddleware):
-            found = current
             break
         current = getattr(current, "app", None)
         if current is None:

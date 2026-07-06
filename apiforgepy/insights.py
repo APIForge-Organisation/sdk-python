@@ -144,9 +144,15 @@ def _detect_release_regressions(db) -> list[dict]:
                 "method":   a["method"],
                 "message":  (
                     f"`{a['method']} {a['route']}` P90 increased by {_pct(delta)} "
-                    f"after {release_tag}. Before: {_fmt(b['avg_p90'])} — After: {_fmt(a['avg_p90'])}."
+                    f"after {release_tag}. Before: {_fmt(b['avg_p90'])} — "
+                    f"After: {_fmt(a['avg_p90'])}."
                 ),
-                "data": {"release": release_tag, "before_p90": b["avg_p90"], "after_p90": a["avg_p90"], "delta_pct": delta * 100},
+                "data": {
+                    "release": release_tag,
+                    "before_p90": b["avg_p90"],
+                    "after_p90": a["avg_p90"],
+                    "delta_pct": delta * 100,
+                },
             })
         elif delta <= -REGRESSION_THRESHOLD:
             insights.append({
@@ -158,7 +164,12 @@ def _detect_release_regressions(db) -> list[dict]:
                     f"{release_tag} improved `{a['method']} {a['route']}` by {_pct(-delta)}. "
                     f"Before: {_fmt(b['avg_p90'])} — After: {_fmt(a['avg_p90'])}."
                 ),
-                "data": {"release": release_tag, "before_p90": b["avg_p90"], "after_p90": a["avg_p90"], "delta_pct": delta * 100},
+                "data": {
+                    "release": release_tag,
+                    "before_p90": b["avg_p90"],
+                    "after_p90": a["avg_p90"],
+                    "delta_pct": delta * 100,
+                },
             })
     return insights
 

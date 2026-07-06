@@ -1,6 +1,5 @@
 import time
 
-
 CIRCUIT_OPEN_S    = 60
 FAILURE_THRESHOLD = 5
 
@@ -24,4 +23,7 @@ class LocalTransport:
             if self._failures >= FAILURE_THRESHOLD:
                 self._open_until = time.time() + CIRCUIT_OPEN_S
                 self._failures = 0
-                print(f"[apiforgepy] SQLite write failures — pausing for {CIRCUIT_OPEN_S}s. Error: {e}")
+                print(
+                    f"[apiforgepy] SQLite write failures — "
+                    f"pausing for {CIRCUIT_OPEN_S}s. Error: {e}"
+                )

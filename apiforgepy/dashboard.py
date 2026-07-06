@@ -4,9 +4,9 @@ import sys
 import threading
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
-from .insights import get_insights, compute_health_score
+from .insights import compute_health_score, get_insights
 
 # <<DASHBOARD_UI_START>>
 _HTML = """\

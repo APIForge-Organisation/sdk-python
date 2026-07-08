@@ -47,6 +47,10 @@ Changelog     = "https://github.com/APIForge-Organisation/sdk-python/blob/main/C
 where = ["."]
 include = ["apiforgepy*"]
 
+[tool.setuptools.package-data]
+# Vendored React/Babel UMD runtime served by the local dashboard (no CDN fetch).
+apiforgepy = ["assets/*.js"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 

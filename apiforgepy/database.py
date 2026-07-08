@@ -296,7 +296,8 @@ class ApiForgeDatabase:
             )
             SELECT rt.release_tag,
                    rt.release_ts,
-                   (SELECT COUNT(*) FROM known_routes WHERE first_seen <= rt.release_ts + 60) AS routes_affected
+                   (SELECT COUNT(*) FROM known_routes
+                    WHERE first_seen <= rt.release_ts + 60) AS routes_affected
             FROM release_times rt
             ORDER BY rt.release_ts DESC
             LIMIT 20

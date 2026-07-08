@@ -1,12 +1,10 @@
 import json
 import os
-import sys
 import threading
-import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
-from .insights import get_insights, compute_health_score
+from .insights import compute_health_score, get_insights
 
 # <<DASHBOARD_UI_START>>
 _HTML = """\
@@ -1687,35 +1685,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 """
 # <<DASHBOARD_UI_END>>
 
-_ASSET_URLS = {
-    "react.js":     "https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js",
-    "react-dom.js": "https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js",
-    "babel.js":     "https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js",
-}
-
-
-def _asset_cache_dir() -> str:
-    if sys.platform == "win32":
-        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    else:
-        base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
-    return os.path.join(base, "apiforgepy", "assets")
-
-
-def _ensure_assets() -> None:
-    """Download JS runtime assets to local cache on first startup (one-time, ~1.5 MB)."""
-    directory = _asset_cache_dir()
-    os.makedirs(directory, exist_ok=True)
-    for name, url in _ASSET_URLS.items():
-        path = os.path.join(directory, name)
-        if not os.path.exists(path):
-            try:
-                with urllib.request.urlopen(url, timeout=20) as resp:
-                    data = resp.read()
-                with open(path, "wb") as f:
-                    f.write(data)
-            except Exception:
-                pass  # Endpoint returns 503 until downloaded
+# React/Babel UMD runtime, vendored into the package — no CDN fetch, so the local
+# dashboard stays offline- and privacy-first (parity with the Node/PHP SDKs).
+# Versions kept in sync with the Node SDK: react 18.3.1, react-dom 18.3.1,
+# @babel/standalone 7.29.7.
+_ASSET_NAMES = ("react.js", "react-dom.js", "babel.js")
+_ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 
 def _make_handler(db):
@@ -1768,12 +1743,12 @@ def _make_handler(db):
                 self._json(get_insights(db))
             elif path.startswith("/assets/"):
                 name = path[len("/assets/"):]
-                asset_path = os.path.join(_asset_cache_dir(), name)
-                if name in _ASSET_URLS and os.path.exists(asset_path):
+                asset_path = os.path.join(_ASSET_DIR, name)
+                if name in _ASSET_NAMES and os.path.exists(asset_path):
                     with open(asset_path, "rb") as f:
                         self._respond(200, "application/javascript", f.read())
                 else:
-                    self._respond(503, "text/plain", b"Asset downloading, retry in a moment")
+                    self._respond(404, "text/plain", b"Not found")
             else:
                 self._respond(404, "text/plain", b"Not found")
 
@@ -1793,7 +1768,6 @@ def _make_handler(db):
 
 
 def start_dashboard(db, port: int):
-    _ensure_assets()
     handler = _make_handler(db)
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     server.daemon_threads = True  # request handler threads don't block process exit

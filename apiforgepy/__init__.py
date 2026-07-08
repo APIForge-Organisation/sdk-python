@@ -26,6 +26,12 @@ from .transport import LocalTransport
 __version__ = "3.0.0"
 __all__ = ["ApiForgeMiddleware"]
 
+# Hard floor for the send cadence. The `_flush_interval` kwarg stays internal (used by
+# the test suite with larger values); the floor guarantees no caller can shorten the
+# delay below 60s. This only guards against misconfiguration — real ingest throttling
+# is enforced server-side (per-key rate limit + monthly quota).
+_MIN_FLUSH_INTERVAL_MS = 60_000
+
 
 class ApiForgeMiddleware(_Base):
     """
@@ -86,7 +92,7 @@ class ApiForgeMiddleware(_Base):
             transport = LocalTransport(self._db)
             config["store_routes"] = self._db.upsert_known_routes
 
-        aggregator = Aggregator(transport, _flush_interval)
+        aggregator = Aggregator(transport, max(_flush_interval, _MIN_FLUSH_INTERVAL_MS))
         aggregator.start()
 
         if not is_cloud and dashboard_port:

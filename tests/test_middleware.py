@@ -90,6 +90,32 @@ class TestSampling:
         assert resp.status_code == 200
 
 
+class TestFlushIntervalFloor:
+    """The send cadence is floored at 60s; no caller can shorten it below that."""
+
+    def _interval_seconds(self, requested_ms):
+        # Instantiate directly so we can read the aggregator's effective interval.
+        async def dummy_app(scope, receive, send):
+            return None
+
+        mw = ApiForgeMiddleware(
+            dummy_app,
+            db_path=":memory:",
+            dashboard_port=0,
+            _flush_interval=requested_ms,
+        )
+        try:
+            return mw._aggregator_ref._flush_interval
+        finally:
+            mw.shutdown()
+
+    def test_sub_minute_interval_is_clamped_to_60s(self):
+        assert self._interval_seconds(1) == 60.0
+
+    def test_default_interval_is_60s(self):
+        assert self._interval_seconds(60_000) == 60.0
+
+
 class TestErrorHandling:
     def test_5xx_response_passes_through(self):
         client = TestClient(make_app(), raise_server_exceptions=False)

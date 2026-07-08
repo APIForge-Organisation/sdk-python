@@ -23,7 +23,7 @@ from .database import ApiForgeDatabase
 from .middleware import ApiForgeMiddleware as _Base
 from .transport import LocalTransport
 
-__version__ = "3.0.0"
+__version__ = "4.0.0"
 __all__ = ["ApiForgeMiddleware"]
 
 # Hard floor for the send cadence. The `_flush_interval` kwarg stays internal (used by

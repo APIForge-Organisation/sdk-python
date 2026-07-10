@@ -50,3 +50,33 @@ jobs:
 
       - name: Run lint
         run: ruff check .
+
+  audit:
+    name: Audit runtime dependencies
+    runs-on: ubuntu-latest
+    # Non-blocking on purpose: a new advisory on a dependency must surface, not
+    # stop a release. Make it blocking once the noise level is known.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Audit what users actually install: dev extras never ship. `pip freeze`
+      # already yields the full transitive tree, hence --no-deps.
+      - name: Freeze the runtime dependency tree
+        run: |
+          python -m venv .auditenv
+          .auditenv/bin/pip install --quiet .
+          .auditenv/bin/pip freeze | grep -v '^apiforgepy' > runtime-requirements.txt
+          cat runtime-requirements.txt
+
+      - name: Audit
+        run: |
+          pip install --quiet pip-audit
+          pip-audit --requirement runtime-requirements.txt --no-deps --disable-pip
